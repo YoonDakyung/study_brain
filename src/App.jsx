@@ -166,13 +166,17 @@ function parseStoredRecords(value) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+function sanitizeStoredRecords(records) {
+  return records.filter((record) => !record.hiddenFromToday);
+}
+
 function loadStudyRecords() {
   if (typeof window === 'undefined' || !window.localStorage) return [];
 
   const storageKeys = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
   for (const key of storageKeys) {
     try {
-      const records = parseStoredRecords(window.localStorage.getItem(key));
+      const records = sanitizeStoredRecords(parseStoredRecords(window.localStorage.getItem(key)));
       if (records.length > 0) return records;
     } catch {
       window.localStorage.removeItem(key);
@@ -442,7 +446,7 @@ function TimerRecordItem({ record, isActive, onStart, onStop, onDelete, onReview
 function RecordView({ records, setRecords, today }) {
   const [form, setForm] = useState({ subject: '수학', content: '', hours: '1', minutes: '0' });
   const [activeTimerId, setActiveTimerId] = useState(null);
-  const visibleTodayRecords = records.filter((item) => item.date === today && !item.reviewed && !item.hiddenFromToday);
+  const visibleTodayRecords = records.filter((item) => item.date === today && !item.reviewed);
   const todayEarnedRecords = records.filter((item) => item.date === today && getEarnedSeconds(item) > 0);
   const todayTotalSeconds = todayEarnedRecords.reduce((sum, item) => sum + getEarnedSeconds(item), 0);
   const todayTotal = Math.floor(todayTotalSeconds / 60);
@@ -502,11 +506,7 @@ function RecordView({ records, setRecords, today }) {
   }
 
   function deleteRecord(id) {
-    setRecords((prev) => prev.flatMap((record) => {
-      if (record.id !== id) return [record];
-      if (getEarnedSeconds(record) > 0) return [{ ...record, hiddenFromToday: true }];
-      return [];
-    }));
+    setRecords((prev) => prev.filter((record) => record.id !== id));
     if (activeTimerId === id) setActiveTimerId(null);
   }
 
