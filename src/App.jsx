@@ -146,6 +146,11 @@ function getSubject(subject) {
   return SUBJECTS.find((item) => item.name === subject) || SUBJECTS[SUBJECTS.length - 1];
 }
 
+function markReviewedOnly(record) {
+  if (record.reviewed) return record;
+  return { ...record, reviewed: true };
+}
+
 function getLastSevenDays() {
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
@@ -437,8 +442,9 @@ function TimerRecordItem({ record, isActive, onStart, onStop, onDelete, onReview
 function RecordView({ records, setRecords, today }) {
   const [form, setForm] = useState({ subject: '수학', content: '', hours: '1', minutes: '0' });
   const [activeTimerId, setActiveTimerId] = useState(null);
-  const todayRecords = records.filter((item) => item.date === today && !item.reviewed && !item.hiddenFromToday);
-  const todayTotalSeconds = todayRecords.reduce((sum, item) => sum + getEarnedSeconds(item), 0);
+  const visibleTodayRecords = records.filter((item) => item.date === today && !item.reviewed && !item.hiddenFromToday);
+  const todayEarnedRecords = records.filter((item) => item.date === today && getEarnedSeconds(item) > 0);
+  const todayTotalSeconds = todayEarnedRecords.reduce((sum, item) => sum + getEarnedSeconds(item), 0);
   const todayTotal = Math.floor(todayTotalSeconds / 60);
 
   useEffect(() => {
@@ -505,7 +511,7 @@ function RecordView({ records, setRecords, today }) {
   }
 
   function markReview(id) {
-    setRecords((prev) => prev.map((record) => record.id === id ? { ...record, reviewed: true } : record));
+    setRecords((prev) => prev.map((record) => record.id === id ? markReviewedOnly(record) : record));
     if (activeTimerId === id) setActiveTimerId(null);
   }
 
@@ -544,13 +550,13 @@ function RecordView({ records, setRecords, today }) {
       <section className="panel day-panel">
         <div className="section-head">
           <h2>오늘의 기록</h2>
-          <span>총 {todayRecords.length}개 / {formatElapsed(todayTotalSeconds)}</span>
+          <span>총 {visibleTodayRecords.length}개 / {formatElapsed(todayTotalSeconds)}</span>
         </div>
-        {todayRecords.length === 0 ? (
+        {visibleTodayRecords.length === 0 ? (
           <EmptyState title="오늘 기록이 비어 있어요" message="왼쪽 폼에서 첫 공부 기록을 추가해보세요." />
         ) : (
           <div className="record-list">
-            {todayRecords.map((record) => (
+            {visibleTodayRecords.map((record) => (
               <TimerRecordItem
                 key={record.id}
                 record={record}
@@ -616,8 +622,8 @@ function StatsView({ records, setRecords }) {
     : 'conic-gradient(#e4e9f4 0 100%)';
 
   function startReview() {
-    const targetIds = reviewTargets.map((record) => record.id);
-    setRecords((prev) => prev.map((record) => targetIds.includes(record.id) ? { ...record, reviewed: true } : record));
+    const targetIds = new Set(reviewTargets.map((record) => record.id));
+    setRecords((prev) => prev.map((record) => targetIds.has(record.id) ? markReviewedOnly(record) : record));
   }
 
   function resetAll() {
